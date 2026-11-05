@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, Plus, UserCheck, X, DollarSign, Trash2 } from 'lucide-react';
+import { Search, Plus, UserCheck, X, DollarSign, Trash2, Pencil, Eye } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 
@@ -12,6 +12,8 @@ export default function Trabajadores() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showNewModal, setShowNewModal] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [viewWorker, setViewWorker] = useState(null);
   const [showPayModal, setShowPayModal] = useState(false);
   const [newWorker, setNewWorker] = useState({
     name: '', dni: '', doc_type: 'DNI', address: '', task: 'Mecánico', commission: '',
@@ -55,6 +57,29 @@ export default function Trabajadores() {
 
   const handleCreateWorker = async () => {
     if (!newWorker.name.trim()) return;
+
+    if (editingId) {
+      const { data, error } = await supabase.from('workers').update({
+        name: newWorker.name,
+        dni: newWorker.dni,
+        doc_type: newWorker.doc_type,
+        address: newWorker.address,
+        role: newWorker.task.toLowerCase(),
+        task: newWorker.task,
+        commission: parseFloat(newWorker.commission) || 0,
+        phone: newWorker.phone,
+        phone_alt: newWorker.phone_alt,
+        email: newWorker.email,
+      }).eq('id', editingId).select().single();
+
+      if (data && !error) {
+        setWorkers(workers.map(w => w.id === editingId ? data : w));
+        setShowNewModal(false);
+        setEditingId(null);
+      }
+      return;
+    }
+
     const { data, error } = await supabase.from('workers').insert({
       user_id: user.id,
       name: newWorker.name,
@@ -74,6 +99,28 @@ export default function Trabajadores() {
       setShowNewModal(false);
       setNewWorker({ name: '', dni: '', doc_type: 'DNI', address: '', task: 'Mecánico', commission: '', phone: '', phone_alt: '', email: '' });
     }
+  };
+
+  const handleEditWorker = (w) => {
+    setEditingId(w.id);
+    setNewWorker({
+      name: w.name || '',
+      dni: w.dni || '',
+      doc_type: w.doc_type || 'DNI',
+      address: w.address || '',
+      task: w.task || 'Mecánico',
+      commission: w.commission || '',
+      phone: w.phone || '',
+      phone_alt: w.phone_alt || '',
+      email: w.email || '',
+    });
+    setShowNewModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowNewModal(false);
+    setEditingId(null);
+    setNewWorker({ name: '', dni: '', doc_type: 'DNI', address: '', task: 'Mecánico', commission: '', phone: '', phone_alt: '', email: '' });
   };
 
   const handlePayWorker = async () => {
@@ -164,9 +211,17 @@ export default function Trabajadores() {
                     <td className="py-3 px-3 text-gray-400">{w.address || '-'}</td>
                     <td className="py-3 px-3 text-gray-400">{w.commission ? `${w.commission}%` : '-'}</td>
                     <td className="py-3 px-3 text-right">
-                      <button onClick={() => deleteWorker(w.id)} className="text-red-400 hover:text-red-300 p-1 transition-colors">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        <button onClick={() => setViewWorker(w)} className="text-gray-400 hover:text-gray-200 p-1 transition-colors" title="Ver datos">
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => handleEditWorker(w)} className="text-primary-400 hover:text-primary-300 p-1 transition-colors" title="Editar">
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => deleteWorker(w.id)} className="text-red-400 hover:text-red-300 p-1 transition-colors" title="Eliminar">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -177,11 +232,11 @@ export default function Trabajadores() {
       </div>
 
       {showNewModal && createPortal(
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[9999] p-4" onClick={() => setShowNewModal(false)}>
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[9999] p-4" onClick={handleCloseModal}>
           <div className="bg-[#1a1f2e] border border-gray-700 rounded-2xl w-full max-w-2xl shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 border-b border-gray-700">
-              <h2 className="text-lg font-bold text-white">Nuevo Trabajador</h2>
-              <button onClick={() => setShowNewModal(false)} className="text-gray-400 hover:text-white p-1"><X className="w-5 h-5" /></button>
+              <h2 className="text-lg font-bold text-white">{editingId ? 'Editar Trabajador' : 'Nuevo Trabajador'}</h2>
+              <button onClick={handleCloseModal} className="text-gray-400 hover:text-white p-1"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-4 space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -238,8 +293,10 @@ export default function Trabajadores() {
               </div>
 
               <div className="flex gap-3 pt-2">
-                <button onClick={() => setShowNewModal(false)} className="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-300 py-2.5 rounded-lg text-sm font-medium transition-colors">Cancelar</button>
-                <button onClick={handleCreateWorker} disabled={!newWorker.name.trim()} className="flex-1 bg-primary-600 hover:bg-primary-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">Crear Trabajador</button>
+                <button onClick={handleCloseModal} className="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-300 py-2.5 rounded-lg text-sm font-medium transition-colors">Cancelar</button>
+                <button onClick={handleCreateWorker} disabled={!newWorker.name.trim()} className="flex-1 bg-primary-600 hover:bg-primary-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
+                  {editingId ? 'Guardar Cambios' : 'Crear Trabajador'}
+                </button>
               </div>
             </div>
           </div>
@@ -308,6 +365,42 @@ export default function Trabajadores() {
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setShowPayModal(false)} className="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-300 py-2.5 rounded-lg text-sm font-medium transition-colors">Cancelar</button>
                 <button onClick={handlePayWorker} disabled={!payForm.worker_id || !payForm.concept || !payForm.amount} className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">Registrar Pago</button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {viewWorker && createPortal(
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[9999] p-4" onClick={() => setViewWorker(null)}>
+          <div className="bg-[#1a1f2e] border border-gray-700 rounded-2xl w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b border-gray-700">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <Eye className="w-5 h-5 text-primary-400" />
+                Datos del Trabajador
+              </h2>
+              <button onClick={() => setViewWorker(null)} className="text-gray-400 hover:text-white p-1"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-4 space-y-3">
+              {[
+                ['Nombre', viewWorker.name],
+                ['Tipo documento', viewWorker.doc_type || '-'],
+                ['DNI', viewWorker.dni || '-'],
+                ['Tarea', viewWorker.task || '-'],
+                ['Comisión', viewWorker.commission ? `${viewWorker.commission}%` : '-'],
+                ['Domicilio', viewWorker.address || '-'],
+                ['Teléfono', viewWorker.phone || '-'],
+                ['Tel. alternativo', viewWorker.phone_alt || '-'],
+                ['Email', viewWorker.email || '-'],
+              ].map(([label, value]) => (
+                <div key={label} className="flex justify-between items-start gap-4 bg-[#0f1219] border border-gray-700 rounded-lg px-3 py-2.5">
+                  <span className="text-xs text-gray-500 font-medium">{label}</span>
+                  <span className="text-sm text-white text-right">{value}</span>
+                </div>
+              ))}
+              <div className="flex justify-end pt-2">
+                <button onClick={() => setViewWorker(null)} className="bg-gray-700 hover:bg-gray-600 text-gray-300 px-5 py-2.5 rounded-lg text-sm font-medium transition-colors">Cerrar</button>
               </div>
             </div>
           </div>
