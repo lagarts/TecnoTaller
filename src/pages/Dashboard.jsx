@@ -27,7 +27,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user?.role === 'worker') navigate('/mis-pagos', { replace: true });
+    if (user?.role === 'worker') navigate('/cobros/mis-cobros', { replace: true });
   }, [user, navigate]);
 
   const allCards = user?.role === 'admin' ? [...menuCards, adminCard] : menuCards;

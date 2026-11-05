@@ -52,7 +52,7 @@ export default function Sidebar({ collapsed, onToggle }) {
   const navigate = useNavigate();
 
   const allMenuItems = user?.role === 'worker'
-    ? [{ path: '/mis-pagos', label: 'Mis Pagos', icon: DollarSign }]
+    ? [{ path: '/cobros/mis-cobros', label: 'Mis Cobros', icon: DollarSign }]
     : user?.role === 'admin'
     ? [...menuItems, { path: '/admin', label: 'Admin', icon: Shield }]
     : menuItems;

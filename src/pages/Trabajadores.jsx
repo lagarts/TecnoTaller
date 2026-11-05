@@ -149,7 +149,7 @@ export default function Trabajadores() {
       if (worker?.profile_id) {
         await supabase.from('notifications').insert({
           title: 'Pago registrado',
-          message: `Se te registró un pago de $${Number(data.amount).toLocaleString()} (${data.concept}). Ingresá a "Mis pagos" para confirmarlo.`,
+          message: `Se te registró un pago de $${Number(data.amount).toLocaleString()} (${data.concept}). Ingresá a "Mis cobros" para confirmarlo.`,
           created_by: user.id,
           user_id: worker.profile_id,
         });

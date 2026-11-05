@@ -91,7 +91,7 @@ function AppRoutes() {
         <Route path="configuracion" element={<Configuracion />} />
         <Route path="mi-cuenta" element={<MiCuenta />} />
         <Route path="admin" element={<AdminPanel />} />
-        <Route path="mis-pagos" element={<MisPagos />} />
+        <Route path="cobros/mis-cobros" element={<MisPagos />} />
       </Route>
 
       <Route path="/portal/:userId" element={<PortalCliente />} />

@@ -24,7 +24,7 @@ export default function Login() {
     const result = await login(email, password);
     setLoading(false);
     if (result.success) {
-      navigate(result.user?.role === 'worker' ? '/mis-pagos' : '/inicio');
+      navigate(result.user?.role === 'worker' ? '/cobros/mis-cobros' : '/inicio');
     } else {
       setError(result.error);
     }

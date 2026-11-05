@@ -61,7 +61,7 @@ export default function MisPagos() {
 
       <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <div>
-          <h1 className="text-xl font-bold text-white">Mis Pagos</h1>
+          <h1 className="text-xl font-bold text-white">Mis Cobros</h1>
           <p className="text-gray-500 text-xs mt-1">
             {payments.length} pago{payments.length !== 1 ? 's' : ''} • Total: ${total.toLocaleString()}
             {pendientes > 0 && <span className="text-yellow-400"> • {pendientes} a confirmar</span>}
