@@ -5,7 +5,7 @@ const reportesOptions = [
   { label: 'Historial de Caja', path: '/reportes/historial-caja', icon: DollarSign, emoji: '💰', desc: 'Movimientos de caja' },
   { label: 'Venta Mensual', path: '/reportes/venta-mensual', icon: TrendingUp, emoji: '📈', desc: 'Resumen mensual' },
   { label: 'Venta Anual', path: '/reportes/venta-anual', icon: Activity, emoji: '📊', desc: 'Resumen anual' },
-  { label: 'Venta Dividida', path: '/reportes/venta-dividida', icon: PieChart, emoji: '🥧', desc: 'Ventas por categoría' },
+  { label: 'Venta Dividida', path: '/reportes/venta-dividida', icon: PieChart, emoji: '🥧', desc: 'Por método y origen' },
 ];
 
 export default function Reportes() {
