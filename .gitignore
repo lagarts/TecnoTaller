@@ -31,3 +31,6 @@ desktop.ini
 protn taller.txt
 taller mecanico.cdr
 taller-mecánico-app/
+
+.vercel
+.env*
