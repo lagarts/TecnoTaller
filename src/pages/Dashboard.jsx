@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -24,6 +25,10 @@ const adminCard = { label: 'Admin', path: '/admin', icon: Shield, emoji: 'ğŸ›¡ï¸
 export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (user?.role === 'worker') navigate('/mis-pagos', { replace: true });
+  }, [user, navigate]);
 
   const allCards = user?.role === 'admin' ? [...menuCards, adminCard] : menuCards;
 

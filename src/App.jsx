@@ -33,6 +33,7 @@ import AdminPanel from './pages/AdminPanel';
 import ReservarTurno from './pages/public/ReservarTurno';
 import HistorialPatente from './pages/public/HistorialPatente';
 import PortalCliente from './pages/public/PortalCliente';
+import MisPagos from './pages/trabajador/MisPagos';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -90,6 +91,7 @@ function AppRoutes() {
         <Route path="configuracion" element={<Configuracion />} />
         <Route path="mi-cuenta" element={<MiCuenta />} />
         <Route path="admin" element={<AdminPanel />} />
+        <Route path="mis-pagos" element={<MisPagos />} />
       </Route>
 
       <Route path="/portal/:userId" element={<PortalCliente />} />

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, Plus, UserCheck, X, DollarSign, Trash2, Pencil, Eye } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { Search, Plus, UserCheck, X, DollarSign, Trash2, Pencil, Eye, KeyRound, CheckCircle, Clock } from 'lucide-react';
+import { supabase, createAuthUser } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 
 const tareas = ['Mecánico', 'Electricista', 'Latonero', 'Pintor', 'Administrativo', 'Otro'];
@@ -14,6 +14,11 @@ export default function Trabajadores() {
   const [showNewModal, setShowNewModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [viewWorker, setViewWorker] = useState(null);
+  const [viewPayments, setViewPayments] = useState([]);
+  const [showAccountModal, setShowAccountModal] = useState(false);
+  const [accountWorker, setAccountWorker] = useState(null);
+  const [accForm, setAccForm] = useState({ email: '', password: '' });
+  const [accCreating, setAccCreating] = useState(false);
   const [showPayModal, setShowPayModal] = useState(false);
   const [newWorker, setNewWorker] = useState({
     name: '', dni: '', doc_type: 'DNI', address: '', task: 'Mecánico', commission: '',
@@ -133,13 +138,72 @@ export default function Trabajadores() {
       method: payForm.method,
       discount_from_cash: payForm.discount_from_cash,
       notes: payForm.notes,
+      status: 'pendiente',
     }).select().single();
 
-    if (data) {
+    if (data && !error) {
       setPayments([data, ...payments]);
+
+      // Si el trabajador tiene cuenta, notificarle
+      const worker = workers.find(w => w.id === payForm.worker_id);
+      if (worker?.profile_id) {
+        await supabase.from('notifications').insert({
+          title: 'Pago registrado',
+          message: `Se te registró un pago de $${Number(data.amount).toLocaleString()} (${data.concept}). Ingresá a "Mis pagos" para confirmarlo.`,
+          created_by: user.id,
+          user_id: worker.profile_id,
+        });
+      }
+
       setShowPayModal(false);
       setPayForm({ worker_id: '', concept: '', amount: '', method: 'efectivo', discount_from_cash: false, notes: '' });
     }
+  };
+
+  const handleViewWorker = async (w) => {
+    setViewWorker(w);
+    setViewPayments([]);
+    const { data } = await supabase
+      .from('worker_payments')
+      .select('*')
+      .eq('worker_id', w.id)
+      .order('created_at', { ascending: false });
+    setViewPayments(data || []);
+  };
+
+  const handleOpenAccount = (w) => {
+    setAccountWorker(w);
+    setAccForm({ email: w.account_email || w.email || '', password: '' });
+    setShowAccountModal(true);
+  };
+
+  const handleCreateAccount = async () => {
+    if (!accForm.email.trim() || accForm.password.length < 6) return;
+    setAccCreating(true);
+    const { userId, error } = await createAuthUser({
+      email: accForm.email.trim(),
+      password: accForm.password,
+      name: accountWorker.name,
+      role: 'worker',
+    });
+    if (error) {
+      alert('Error: ' + error);
+      setAccCreating(false);
+      return;
+    }
+    const { error: updErr } = await supabase.from('workers').update({
+      profile_id: userId,
+      account_email: accForm.email.trim(),
+    }).eq('id', accountWorker.id);
+    if (updErr) {
+      alert('Cuenta creada pero no se pudo vincular: ' + updErr.message);
+    } else {
+      setWorkers(workers.map(w => w.id === accountWorker.id
+        ? { ...w, profile_id: userId, account_email: accForm.email.trim() }
+        : w));
+    }
+    setShowAccountModal(false);
+    setAccCreating(false);
   };
 
   const deleteWorker = async (id) => {
@@ -212,8 +276,11 @@ export default function Trabajadores() {
                     <td className="py-3 px-3 text-gray-400">{w.commission ? `${w.commission}%` : '-'}</td>
                     <td className="py-3 px-3 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => setViewWorker(w)} className="text-gray-400 hover:text-gray-200 p-1 transition-colors" title="Ver datos">
+                        <button onClick={() => handleViewWorker(w)} className="text-gray-400 hover:text-gray-200 p-1 transition-colors" title="Ver datos">
                           <Eye className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => handleOpenAccount(w)} className={`p-1 transition-colors ${w.profile_id ? 'text-emerald-400 hover:text-emerald-300' : 'text-yellow-400 hover:text-yellow-300'}`} title={w.profile_id ? `Cuenta: ${w.account_email}` : 'Crear cuenta de acceso'}>
+                          <KeyRound className="w-4 h-4" />
                         </button>
                         <button onClick={() => handleEditWorker(w)} className="text-primary-400 hover:text-primary-300 p-1 transition-colors" title="Editar">
                           <Pencil className="w-4 h-4" />
@@ -374,15 +441,15 @@ export default function Trabajadores() {
 
       {viewWorker && createPortal(
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[9999] p-4" onClick={() => setViewWorker(null)}>
-          <div className="bg-[#1a1f2e] border border-gray-700 rounded-2xl w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-4 border-b border-gray-700">
+          <div className="bg-[#1a1f2e] border border-gray-700 rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b border-gray-700 flex-shrink-0">
               <h2 className="text-lg font-bold text-white flex items-center gap-2">
                 <Eye className="w-5 h-5 text-primary-400" />
                 Datos del Trabajador
               </h2>
               <button onClick={() => setViewWorker(null)} className="text-gray-400 hover:text-white p-1"><X className="w-5 h-5" /></button>
             </div>
-            <div className="p-4 space-y-3">
+            <div className="p-4 space-y-3 overflow-y-auto">
               {[
                 ['Nombre', viewWorker.name],
                 ['Tipo documento', viewWorker.doc_type || '-'],
@@ -393,14 +460,80 @@ export default function Trabajadores() {
                 ['Teléfono', viewWorker.phone || '-'],
                 ['Tel. alternativo', viewWorker.phone_alt || '-'],
                 ['Email', viewWorker.email || '-'],
+                ['Cuenta de acceso', viewWorker.profile_id ? (viewWorker.account_email || 'Creada ✓') : 'Sin cuenta'],
               ].map(([label, value]) => (
                 <div key={label} className="flex justify-between items-start gap-4 bg-[#0f1219] border border-gray-700 rounded-lg px-3 py-2.5">
                   <span className="text-xs text-gray-500 font-medium">{label}</span>
-                  <span className="text-sm text-white text-right">{value}</span>
+                  <span className={`text-sm text-right ${label === 'Cuenta de acceso' && viewWorker.profile_id ? 'text-emerald-400' : 'text-white'}`}>{value}</span>
                 </div>
               ))}
+
+              <div className="border-t border-gray-700 pt-3">
+                <p className="text-xs font-bold text-primary-400 uppercase tracking-wider mb-3">Historial de Pagos</p>
+                {viewPayments.length === 0 ? (
+                  <p className="text-gray-500 text-sm text-center py-3">No hay pagos registrados</p>
+                ) : (
+                  <div className="space-y-2">
+                    {viewPayments.map(p => (
+                      <div key={p.id} className="bg-[#0f1219] border border-gray-700 rounded-lg px-3 py-2.5 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm text-white font-medium">{p.concept} — ${Number(p.amount).toLocaleString()}</p>
+                          <p className="text-[11px] text-gray-500">
+                            {new Date(p.created_at).toLocaleDateString('es-AR')} • {p.method}
+                          </p>
+                        </div>
+                        <span className={`flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-full flex-shrink-0 ${
+                          p.status === 'confirmado'
+                            ? 'bg-emerald-500/20 text-emerald-300'
+                            : 'bg-yellow-500/20 text-yellow-300'
+                        }`}>
+                          {p.status === 'confirmado' ? <CheckCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                          {p.status === 'confirmado' ? 'Confirmado' : 'A confirmar'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div className="flex justify-end pt-2">
                 <button onClick={() => setViewWorker(null)} className="bg-gray-700 hover:bg-gray-600 text-gray-300 px-5 py-2.5 rounded-lg text-sm font-medium transition-colors">Cerrar</button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {showAccountModal && createPortal(
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[9999] p-4" onClick={() => setShowAccountModal(false)}>
+          <div className="bg-[#1a1f2e] border border-gray-700 rounded-2xl w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b border-gray-700">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <KeyRound className="w-5 h-5 text-yellow-400" />
+                {accountWorker?.profile_id ? 'Cuenta del Trabajador' : 'Crear Cuenta'}
+              </h2>
+              <button onClick={() => setShowAccountModal(false)} className="text-gray-400 hover:text-white p-1"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-4 space-y-4">
+              <p className="text-xs text-gray-400">
+                {accountWorker?.profile_id
+                  ? `${accountWorker.name} ya tiene cuenta. Podés ver los datos o crear una nueva si cambia el email.`
+                  : `Creá una cuenta para que ${accountWorker?.name} pueda ingresar y confirmar sus pagos.`}
+              </p>
+              <div className="space-y-2">
+                <label className="text-xs text-gray-400">Email *</label>
+                <input type="email" placeholder="trabajador@..." className={inputClass} value={accForm.email} onChange={e => setAccForm({ ...accForm, email: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs text-gray-400">Contraseña * <span className="text-gray-600">(mínimo 6)</span></label>
+                <input type="text" placeholder="Contraseña..." className={inputClass} value={accForm.password} onChange={e => setAccForm({ ...accForm, password: e.target.value })} />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setShowAccountModal(false)} className="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-300 py-2.5 rounded-lg text-sm font-medium transition-colors">Cancelar</button>
+                <button onClick={handleCreateAccount} disabled={accCreating || !accForm.email.trim() || accForm.password.length < 6} className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
+                  {accCreating ? 'Creando...' : 'Crear Cuenta'}
+                </button>
               </div>
             </div>
           </div>

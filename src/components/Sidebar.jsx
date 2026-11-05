@@ -51,7 +51,9 @@ export default function Sidebar({ collapsed, onToggle }) {
   const { logout, user } = useAuth();
   const navigate = useNavigate();
 
-  const allMenuItems = user?.role === 'admin'
+  const allMenuItems = user?.role === 'worker'
+    ? [{ path: '/mis-pagos', label: 'Mis Pagos', icon: DollarSign }]
+    : user?.role === 'admin'
     ? [...menuItems, { path: '/admin', label: 'Admin', icon: Shield }]
     : menuItems;
 
