@@ -10,9 +10,12 @@ export default function Contactos() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
-  const [newContact, setNewContact] = useState({
-    name: '', phone: '', email: '', address: '', notes: ''
-  });
+  const emptyContact = {
+    name: '', phone: '', email: '', address: '', notes: '',
+    v_dominio: '', v_marca: '', v_modelo: '', v_tipo: '', v_color: '',
+    v_anio: '', v_chasis: '', v_cc: '', v_seguro: ''
+  };
+  const [newContact, setNewContact] = useState(emptyContact);
 
   const inputClass = "bg-[#1a1f2e] border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 w-full";
 
@@ -48,9 +51,26 @@ export default function Contactos() {
     }).select().single();
 
     if (data) {
+      // Crear vehículo si se cargó el dominio
+      if (newContact.v_dominio.trim()) {
+        const { error: vErr } = await supabase.from('vehicles').insert({
+          user_id: user.id,
+          client_id: data.id,
+          patente: newContact.v_dominio.trim().toUpperCase(),
+          brand: newContact.v_marca,
+          model: newContact.v_modelo,
+          vehicle_type: newContact.v_tipo,
+          color: newContact.v_color,
+          year: newContact.v_anio ? Number(newContact.v_anio) : null,
+          chasis_number: newContact.v_chasis,
+          cc: newContact.v_cc ? Number(newContact.v_cc) : null,
+          insurance: newContact.v_seguro,
+        });
+        if (vErr) console.error('Error creating vehicle:', vErr);
+      }
       setContacts([...contacts, data]);
       setShowModal(false);
-      setNewContact({ name: '', phone: '', email: '', address: '', notes: '' });
+      setNewContact(emptyContact);
     }
   };
 
@@ -67,7 +87,7 @@ export default function Contactos() {
           <h1 className="text-xl font-bold text-white">Clientes</h1>
           <p className="text-gray-500 text-xs mt-1">{filtered.length} clientes</p>
         </div>
-        <button onClick={() => { setShowModal(true); setNewContact({ name: '', phone: '', email: '', address: '', notes: '' }); }} className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+        <button onClick={() => { setShowModal(true); setNewContact(emptyContact); }} className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
           <Plus className="w-4 h-4" />
           Nuevo Cliente
         </button>
@@ -129,12 +149,12 @@ export default function Contactos() {
 
       {showModal && createPortal(
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[9999] p-4" onClick={() => setShowModal(false)}>
-          <div className="bg-[#1a1f2e] border border-gray-700 rounded-2xl w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-4 border-b border-gray-700">
+          <div className="bg-[#1a1f2e] border border-gray-700 rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b border-gray-700 flex-shrink-0">
               <h2 className="text-lg font-bold text-white">Nuevo Cliente</h2>
               <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-white p-1"><X className="w-5 h-5" /></button>
             </div>
-            <div className="p-4 space-y-4">
+            <div className="p-4 space-y-4 overflow-y-auto">
               <div className="space-y-2">
                 <label className="text-xs text-gray-400">Nombre *</label>
                 <input type="text" placeholder="Nombre del cliente..." className={inputClass} value={newContact.name} onChange={e => setNewContact({ ...newContact, name: e.target.value })} />
@@ -155,6 +175,55 @@ export default function Contactos() {
                 <label className="text-xs text-gray-400">Notas</label>
                 <textarea className={inputClass + " resize-none"} rows={2} placeholder="Opcional..." value={newContact.notes} onChange={e => setNewContact({ ...newContact, notes: e.target.value })} />
               </div>
+
+              <div className="border-t border-gray-700 pt-3">
+                <p className="text-xs font-bold text-primary-400 uppercase tracking-wider mb-3">Datos del Vehículo</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <label className="text-xs text-gray-400"><span className="text-red-400">*</span> Dominio</label>
+                    <input type="text" placeholder="Patente..." className={inputClass + " uppercase"} value={newContact.v_dominio} onChange={e => setNewContact({ ...newContact, v_dominio: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs text-gray-400">Año</label>
+                    <input type="number" placeholder="2024..." className={inputClass} value={newContact.v_anio} onChange={e => setNewContact({ ...newContact, v_anio: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs text-gray-400">Marca</label>
+                    <select className={inputClass} value={newContact.v_marca} onChange={e => setNewContact({ ...newContact, v_marca: e.target.value })}>
+                      <option value="">Seleccionar...</option>
+                      <option>Fiat</option><option>Volkswagen</option><option>Toyota</option><option>Ford</option><option>Chevrolet</option><option>Peugeot</option><option>Renault</option><option>Honda</option><option>Suzuki</option><option>Jeep</option><option>Citroën</option><option>Otro</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs text-gray-400">N° Chasis</label>
+                    <input type="text" placeholder="Chasis..." className={inputClass} value={newContact.v_chasis} onChange={e => setNewContact({ ...newContact, v_chasis: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs text-gray-400">Modelo</label>
+                    <input type="text" placeholder="Modelo..." className={inputClass} value={newContact.v_modelo} onChange={e => setNewContact({ ...newContact, v_modelo: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs text-gray-400">CC</label>
+                    <input type="number" placeholder="1000..." className={inputClass} value={newContact.v_cc} onChange={e => setNewContact({ ...newContact, v_cc: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs text-gray-400">Tipo</label>
+                    <select className={inputClass} value={newContact.v_tipo} onChange={e => setNewContact({ ...newContact, v_tipo: e.target.value })}>
+                      <option value="">Seleccionar...</option>
+                      <option>Auto</option><option>Camioneta</option><option>Moto</option><option>Camión</option><option>Van</option><option>Otro</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs text-gray-400">Seguro</label>
+                    <input type="text" placeholder="Seguro..." className={inputClass} value={newContact.v_seguro} onChange={e => setNewContact({ ...newContact, v_seguro: e.target.value })} />
+                  </div>
+                  <div className="space-y-2 col-span-2">
+                    <label className="text-xs text-gray-400">Color</label>
+                    <input type="text" placeholder="Color..." className={inputClass} value={newContact.v_color} onChange={e => setNewContact({ ...newContact, v_color: e.target.value })} />
+                  </div>
+                </div>
+              </div>
+
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setShowModal(false)} className="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-300 py-2.5 rounded-lg text-sm font-medium transition-colors">Cancelar</button>
                 <button onClick={handleCreate} disabled={!newContact.name.trim()} className="flex-1 bg-primary-600 hover:bg-primary-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">Crear Cliente</button>

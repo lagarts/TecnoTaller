@@ -15,7 +15,6 @@ const menuItems = [
       { path: '/taller/ordenes', label: 'Órdenes', icon: ClipboardList },
       { path: '/taller/presupuesto', label: 'Presupuesto', icon: BookOpen },
       { path: '/taller/calendario', label: 'Calendario', icon: Calendar },
-      { path: '/taller/vehiculos', label: 'Vehículos', icon: Car },
       { path: '/taller/historico', label: 'Histórico', icon: History },
     ]
   },
