@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, Plus, Phone, Mail, User, X, MapPin, FileText } from 'lucide-react';
+import { Search, Plus, Phone, Mail, User, X, MapPin, FileText, Pencil } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 
@@ -10,6 +10,8 @@ export default function Contactos() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [editVehicleId, setEditVehicleId] = useState(null);
   const emptyContact = {
     name: '', phone: '', email: '', address: '', notes: '',
     v_dominio: '', v_marca: '', v_modelo: '', v_tipo: '', v_color: '',
@@ -74,6 +76,97 @@ export default function Contactos() {
     }
   };
 
+  const handleEdit = async (c) => {
+    setEditId(c.id);
+    setEditVehicleId(null);
+    setNewContact({
+      name: c.name || '',
+      phone: c.phone || '',
+      email: c.email || '',
+      address: c.address || '',
+      notes: c.notes || '',
+      v_dominio: '', v_marca: '', v_modelo: '', v_tipo: '', v_color: '',
+      v_anio: '', v_chasis: '', v_cc: '', v_seguro: ''
+    });
+    // Cargar vehículo vinculado si existe
+    try {
+      const { data: veh } = await supabase
+        .from('vehicles')
+        .select('id, patente, brand, model, vehicle_type, color, year, chasis_number, cc, insurance')
+        .eq('client_id', c.id)
+        .limit(1)
+        .maybeSingle();
+      if (veh) {
+        setEditVehicleId(veh.id);
+        setNewContact(prev => ({
+          ...prev,
+          v_dominio: veh.patente || '',
+          v_marca: veh.brand || '',
+          v_modelo: veh.model || '',
+          v_tipo: veh.vehicle_type || '',
+          v_color: veh.color || '',
+          v_anio: veh.year ? String(veh.year) : '',
+          v_chasis: veh.chasis_number || '',
+          v_cc: veh.cc ? String(veh.cc) : '',
+          v_seguro: veh.insurance || '',
+        }));
+      }
+    } catch (e) {
+      console.error('Error loading vehicle:', e);
+    }
+    setShowModal(true);
+  };
+
+  const handleUpdate = async () => {
+    if (!newContact.name.trim()) return;
+    const { data, error } = await supabase.from('clients').update({
+      name: newContact.name,
+      phone: newContact.phone,
+      email: newContact.email,
+      address: newContact.address,
+      notes: newContact.notes,
+    }).eq('id', editId).select().single();
+
+    if (error) {
+      alert('Error al actualizar: ' + error.message);
+      return;
+    }
+
+    const vehPayload = {
+      patente: newContact.v_dominio.trim().toUpperCase(),
+      brand: newContact.v_marca,
+      model: newContact.v_modelo,
+      vehicle_type: newContact.v_tipo,
+      color: newContact.v_color,
+      year: newContact.v_anio ? Number(newContact.v_anio) : null,
+      chasis_number: newContact.v_chasis,
+      cc: newContact.v_cc ? Number(newContact.v_cc) : null,
+      insurance: newContact.v_seguro,
+    };
+
+    if (editVehicleId) {
+      // Actualizar vehículo existente
+      const { error: vErr } = await supabase.from('vehicles')
+        .update(vehPayload)
+        .eq('id', editVehicleId);
+      if (vErr) console.error('Error updating vehicle:', vErr);
+    } else if (newContact.v_dominio.trim()) {
+      // Crear vehículo nuevo si se cargó el dominio
+      const { error: vErr } = await supabase.from('vehicles').insert({
+        user_id: user.id,
+        client_id: editId,
+        ...vehPayload,
+      });
+      if (vErr) console.error('Error creating vehicle:', vErr);
+    }
+
+    setContacts(contacts.map(c => c.id === editId ? data : c));
+    setShowModal(false);
+    setEditId(null);
+    setEditVehicleId(null);
+    setNewContact(emptyContact);
+  };
+
   const filtered = contacts.filter(c =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
     (c.phone || '').includes(search) ||
@@ -87,7 +180,7 @@ export default function Contactos() {
           <h1 className="text-xl font-bold text-white">Clientes</h1>
           <p className="text-gray-500 text-xs mt-1">{filtered.length} clientes</p>
         </div>
-        <button onClick={() => { setShowModal(true); setNewContact(emptyContact); }} className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+        <button onClick={() => { setShowModal(true); setEditId(null); setEditVehicleId(null); setNewContact(emptyContact); }} className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
           <Plus className="w-4 h-4" />
           Nuevo Cliente
         </button>
@@ -139,6 +232,9 @@ export default function Contactos() {
                         </span>
                       )}
                     </div>
+                    <button onClick={() => handleEdit(c)} className="text-primary-400 hover:text-primary-300 p-2 transition-colors flex-shrink-0" title="Editar cliente">
+                      <Pencil className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
               ))}
@@ -148,10 +244,10 @@ export default function Contactos() {
       </div>
 
       {showModal && createPortal(
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[9999] p-4" onClick={() => setShowModal(false)}>
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[9999] p-4" onClick={() => { setShowModal(false); setEditId(null); setEditVehicleId(null); setNewContact(emptyContact); }}>
           <div className="bg-[#1a1f2e] border border-gray-700 rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 border-b border-gray-700 flex-shrink-0">
-              <h2 className="text-lg font-bold text-white">Nuevo Cliente</h2>
+              <h2 className="text-lg font-bold text-white">{editId ? 'Editar Cliente' : 'Nuevo Cliente'}</h2>
               <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-white p-1"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-4 space-y-4 overflow-y-auto">
@@ -225,8 +321,8 @@ export default function Contactos() {
               </div>
 
               <div className="flex gap-3 pt-2">
-                <button onClick={() => setShowModal(false)} className="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-300 py-2.5 rounded-lg text-sm font-medium transition-colors">Cancelar</button>
-                <button onClick={handleCreate} disabled={!newContact.name.trim()} className="flex-1 bg-primary-600 hover:bg-primary-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">Crear Cliente</button>
+                <button onClick={() => { setShowModal(false); setEditId(null); setEditVehicleId(null); setNewContact(emptyContact); }} className="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-300 py-2.5 rounded-lg text-sm font-medium transition-colors">Cancelar</button>
+                <button onClick={editId ? handleUpdate : handleCreate} disabled={!newContact.name.trim()} className="flex-1 bg-primary-600 hover:bg-primary-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">{editId ? 'Guardar cambios' : 'Crear Cliente'}</button>
               </div>
             </div>
           </div>
