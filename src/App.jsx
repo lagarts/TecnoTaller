@@ -25,7 +25,6 @@ import VentaAnual from './pages/reportes/VentaAnual';
 import VentaDividida from './pages/reportes/VentaDividida';
 import HistoricoCliente from './pages/informes/HistoricoCliente';
 import HistoricoVehiculo from './pages/informes/HistoricoVehiculo';
-import HistoricoDetalladoVehiculo from './pages/informes/HistoricoDetalladoVehiculo';
 import Herramientas from './pages/Herramientas';
 import Configuracion from './pages/Configuracion';
 import MiCuenta from './pages/MiCuenta';
@@ -86,7 +85,6 @@ function AppRoutes() {
         <Route path="reportes/venta-dividida" element={<VentaDividida />} />
         <Route path="informes/historico-cliente" element={<HistoricoCliente />} />
         <Route path="informes/historico-vehiculo" element={<HistoricoVehiculo />} />
-        <Route path="informes/historico-detallado-vehiculo" element={<HistoricoDetalladoVehiculo />} />
         <Route path="herramientas" element={<Herramientas />} />
         <Route path="configuracion" element={<Configuracion />} />
         <Route path="mi-cuenta" element={<MiCuenta />} />

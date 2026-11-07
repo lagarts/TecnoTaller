@@ -35,7 +35,6 @@ const menuItems = [
     label: 'Informes', icon: FileText, children: [
       { path: '/informes/historico-cliente', label: 'Histórico por Cliente', icon: Users },
       { path: '/informes/historico-vehiculo', label: 'Histórico por Vehículo', icon: Car },
-      { path: '/informes/historico-detallado-vehiculo', label: 'Histórico Detallado por Vehículo', icon: History },
     ]
   },
   { path: '/configuracion', label: 'Configuraciones', icon: Sliders },

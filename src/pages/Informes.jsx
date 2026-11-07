@@ -1,10 +1,9 @@
 import { useNavigate } from 'react-router-dom';
-import { Users, Car, History } from 'lucide-react';
+import { Users, Car } from 'lucide-react';
 
 const informesOptions = [
   { label: 'Histórico por Cliente', path: '/informes/historico-cliente', icon: Users, emoji: '👤', desc: 'Historial de un cliente' },
   { label: 'Histórico por Vehículo', path: '/informes/historico-vehiculo', icon: Car, emoji: '🚗', desc: 'Historial de un vehículo' },
-  { label: 'Hist. Detallado por Vehículo', path: '/informes/historico-detallado-vehiculo', icon: History, emoji: '📋', desc: 'Detalle completo del vehículo' },
 ];
 
 export default function Informes() {
