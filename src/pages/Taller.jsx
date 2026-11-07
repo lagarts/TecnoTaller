@@ -1,11 +1,10 @@
 import { useNavigate } from 'react-router-dom';
-import { ClipboardList, BookOpen, Calendar, History } from 'lucide-react';
+import { ClipboardList, BookOpen, Calendar } from 'lucide-react';
 
 const tallerOptions = [
   { label: 'Órdenes', path: '/taller/ordenes', icon: ClipboardList, emoji: '🔧', desc: 'Gestionar órdenes de trabajo' },
   { label: 'Presupuesto', path: '/taller/presupuesto', icon: BookOpen, emoji: '📋', desc: 'Crear y enviar presupuestos' },
   { label: 'Calendario', path: '/taller/calendario', icon: Calendar, emoji: '📅', desc: 'Turnos y agenda' },
-  { label: 'Histórico', path: '/taller/historico', icon: History, emoji: '📁', desc: 'Historial de trabajos' },
 ];
 
 export default function Taller() {

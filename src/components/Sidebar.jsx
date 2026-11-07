@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
-  Home, Wrench, Calendar, Car, History, DollarSign,
+  Home, Wrench, Calendar, Car, DollarSign,
   CreditCard, Package, UserCheck, Phone, BarChart3, FileText,
   Sliders, BookOpen, Users, LogOut, Menu, X, ChevronDown, ChevronRight,
   Shield, ClipboardList, TrendingUp, PieChart, Activity
@@ -15,7 +15,6 @@ const menuItems = [
       { path: '/taller/ordenes', label: 'Órdenes', icon: ClipboardList },
       { path: '/taller/presupuesto', label: 'Presupuesto', icon: BookOpen },
       { path: '/taller/calendario', label: 'Calendario', icon: Calendar },
-      { path: '/taller/historico', label: 'Histórico', icon: History },
     ]
   },
   { path: '/caja', label: 'Caja', icon: DollarSign },

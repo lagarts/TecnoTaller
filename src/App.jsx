@@ -12,7 +12,6 @@ import Presupuesto from './pages/taller/Presupuesto';
 import Calendario from './pages/taller/Calendario';
 import Recordatorios from './pages/taller/Recordatorios';
 import Vehiculos from './pages/taller/Vehiculos';
-import Historico from './pages/taller/Historico';
 import Tienda from './pages/Tienda';
 import Caja from './pages/Caja';
 import CuentaCorrientes from './pages/CuentaCorrientes';
@@ -72,7 +71,6 @@ function AppRoutes() {
         <Route path="taller/calendario" element={<Calendario />} />
         <Route path="taller/recordatorios" element={<Recordatorios />} />
         <Route path="taller/vehiculos" element={<Vehiculos />} />
-        <Route path="taller/historico" element={<Historico />} />
         <Route path="tienda" element={<Tienda />} />
         <Route path="caja" element={<Caja />} />
         <Route path="cuenta-corrientes" element={<CuentaCorrientes />} />
