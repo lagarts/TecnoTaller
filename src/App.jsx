@@ -32,6 +32,8 @@ import ReservarTurno from './pages/public/ReservarTurno';
 import HistorialPatente from './pages/public/HistorialPatente';
 import PortalCliente from './pages/public/PortalCliente';
 import MisPagos from './pages/trabajador/MisPagos';
+import Suscripcion from './pages/Suscripcion';
+import SubscriptionGate from './components/SubscriptionGate';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -60,7 +62,7 @@ function AppRoutes() {
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
       <Route path="/registro" element={<PublicRoute><Register /></PublicRoute>} />
 
-      <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+      <Route path="/" element={<ProtectedRoute><SubscriptionGate><Layout /></SubscriptionGate></ProtectedRoute>}>
         <Route index element={<Navigate to="/inicio" replace />} />
         <Route path="inicio" element={<Dashboard />} />
         <Route path="taller" element={<Taller />} />
@@ -90,6 +92,7 @@ function AppRoutes() {
         <Route path="cobros/mis-cobros" element={<MisPagos />} />
       </Route>
 
+      <Route path="/suscripcion" element={<ProtectedRoute><Suscripcion /></ProtectedRoute>} />
       <Route path="/portal/:userId" element={<PortalCliente />} />
       <Route path="/reservar/:userId" element={<ReservarTurno />} />
       <Route path="/historial" element={<HistorialPatente />} />

@@ -3,7 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import {
   Users, Bell, Trash2, Send, Shield, Gift,
-  Calendar, Search, AlertTriangle, CheckCircle, X
+  Calendar, Search, AlertTriangle, CheckCircle, X, CreditCard,
+  Clock, Check, XCircle, Wallet
 } from 'lucide-react';
 
 export default function AdminPanel() {
@@ -11,6 +12,7 @@ export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState('usuarios');
   const [usuarios, setUsuarios] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [notiTitle, setNotiTitle] = useState('');
@@ -22,6 +24,7 @@ export default function AdminPanel() {
     if (user?.role === 'admin') {
       fetchUsuarios();
       fetchNotifications();
+      fetchPayments();
     }
   }, [user]);
 
@@ -46,6 +49,32 @@ export default function AdminPanel() {
       .select('*')
       .order('created_at', { ascending: false });
     setNotifications(data || []);
+  };
+
+  const fetchPayments = async () => {
+    const { data } = await supabase
+      .from('subscription_payments')
+      .select('*, profiles(name, email)')
+      .order('created_at', { ascending: false });
+    setPayments(data || []);
+  };
+
+  const handleApprovePayment = async (p) => {
+    const who = p.profiles?.name || p.profiles?.email || 'usuario';
+    if (!confirm(`¿Aprobar el pago de ${who} (${p.method === 'mercadopago' ? 'Mercado Pago' : 'PayPal'})?\nSe activará 1 mes de suscripción.`)) return;
+    const { error } = await supabase.rpc('approve_subscription_payment', { p_id: p.id });
+    if (error) { showToast('Error: ' + (error.message || 'error desconocido'), 'error'); return; }
+    fetchPayments();
+    showToast('Pago aprobado — suscripción activada por 1 mes');
+  };
+
+  const handleRejectPayment = async (p) => {
+    const who = p.profiles?.name || p.profiles?.email || 'usuario';
+    if (!confirm(`¿Rechazar el pago de ${who}?\nSe restaurará el acceso anterior (sin período de gracia).`)) return;
+    const { error } = await supabase.rpc('reject_subscription_payment', { p_id: p.id });
+    if (error) { showToast('Error: ' + (error.message || 'error desconocido'), 'error'); return; }
+    fetchPayments();
+    showToast('Pago rechazado');
   };
 
   const handleDeleteUser = async (userId) => {
@@ -178,6 +207,22 @@ export default function AdminPanel() {
         >
           <Bell className="w-4 h-4" />
           Notificaciones
+        </button>
+        <button
+          onClick={() => setActiveTab('suscripcion')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'suscripcion'
+              ? 'border-primary-500 text-primary-400'
+              : 'border-transparent text-gray-500 hover:text-gray-300'
+          }`}
+        >
+          <CreditCard className="w-4 h-4" />
+          Suscripción
+          {payments.filter(p => p.status === 'pendiente').length > 0 && (
+            <span className="bg-yellow-500/20 text-yellow-300 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+              {payments.filter(p => p.status === 'pendiente').length}
+            </span>
+          )}
         </button>
       </div>
 
@@ -353,6 +398,104 @@ export default function AdminPanel() {
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'suscripcion' && (
+          <div className="space-y-6">
+            {/* Pagos pendientes */}
+            <div className="bg-[#1a1f2e] border border-gray-700/50 rounded-xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-700/50 flex items-center gap-2">
+                <Clock className="w-4 h-4 text-yellow-400" />
+                <h3 className="font-semibold text-white text-sm">
+                  Pagos por verificar ({payments.filter(p => p.status === 'pendiente').length})
+                </h3>
+              </div>
+              {payments.filter(p => p.status === 'pendiente').length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <CheckCircle className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No hay pagos pendientes</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-700/30">
+                  {payments.filter(p => p.status === 'pendiente').map(p => (
+                    <div key={p.id} className="px-4 py-3 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className={`w-9 h-9 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${
+                          p.method === 'mercadopago' ? 'bg-blue-500' : 'bg-yellow-500'
+                        }`}>
+                          {p.method === 'mercadopago' ? 'MP' : 'PP'}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-sm text-white font-medium truncate">
+                            {p.profiles?.name || p.profiles?.email || 'Usuario eliminado'}
+                          </p>
+                          <p className="text-[11px] text-gray-500 truncate">
+                            {p.method === 'mercadopago' ? 'Mercado Pago' : 'PayPal'} •{' '}
+                            {p.currency === 'USD' ? `US$${Number(p.amount)}` : `$${Number(p.amount).toLocaleString()}`} •{' '}
+                            {new Date(p.created_at).toLocaleString('es-AR')}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <button
+                          onClick={() => handleApprovePayment(p)}
+                          className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          Aprobar
+                        </button>
+                        <button
+                          onClick={() => handleRejectPayment(p)}
+                          className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                          Rechazar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Historial */}
+            <div className="bg-[#1a1f2e] border border-gray-700/50 rounded-xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-700/50 flex items-center gap-2">
+                <Wallet className="w-4 h-4 text-primary-400" />
+                <h3 className="font-semibold text-white text-sm">Historial de pagos</h3>
+              </div>
+              {payments.filter(p => p.status !== 'pendiente').length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <CreditCard className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">Sin pagos registrados todavía</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-700/30">
+                  {payments.filter(p => p.status !== 'pendiente').map(p => (
+                    <div key={p.id} className="px-4 py-3 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm text-white truncate">
+                          {p.profiles?.name || p.profiles?.email || 'Usuario eliminado'} —{' '}
+                          {p.currency === 'USD' ? `US$${Number(p.amount)}` : `$${Number(p.amount).toLocaleString()}`}
+                          <span className="text-gray-500 font-normal"> ({p.method === 'mercadopago' ? 'MP' : 'PayPal'})</span>
+                        </p>
+                        <p className="text-[11px] text-gray-500">
+                          Declarado: {new Date(p.created_at).toLocaleString('es-AR')}
+                          {p.reviewed_at && ` • Revisado: ${new Date(p.reviewed_at).toLocaleString('es-AR')}`}
+                        </p>
+                      </div>
+                      <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase flex items-center gap-1 flex-shrink-0 ${
+                        p.status === 'aprobado' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'
+                      }`}>
+                        {p.status === 'aprobado' ? <Check className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                        {p.status}
+                      </span>
                     </div>
                   ))}
                 </div>
