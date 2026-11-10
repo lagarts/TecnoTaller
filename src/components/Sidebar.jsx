@@ -5,11 +5,12 @@ import {
   Home, Wrench, Calendar, Car, DollarSign,
   CreditCard, Package, UserCheck, Phone, BarChart3, FileText,
   Sliders, BookOpen, Users, LogOut, Menu, X, ChevronDown, ChevronRight,
-  Shield, ClipboardList, TrendingUp, PieChart, Activity
+  Shield, ClipboardList, TrendingUp, PieChart, Activity, CalendarDays
 } from 'lucide-react';
 
 const menuItems = [
   { path: '/inicio', label: 'Inicio', icon: Home },
+  { path: '/taller/turnos', label: 'Turnos', icon: CalendarDays },
   {
     label: 'Taller', icon: Wrench, children: [
       { path: '/taller/ordenes', label: 'Órdenes', icon: ClipboardList },
@@ -50,7 +51,7 @@ export default function Sidebar({ collapsed, onToggle }) {
   const navigate = useNavigate();
 
   const allMenuItems = user?.role === 'worker'
-    ? [{ path: '/cobros/mis-cobros', label: 'Mis Cobros', icon: DollarSign }]
+    ? [{ path: '/cobros/mis-cobros', label: 'Mis Cobros', icon: DollarSign }, { path: '/taller/turnos', label: 'Turnos', icon: CalendarDays }]
     : user?.role === 'admin'
     ? [...menuItems, { path: '/admin', label: 'Admin', icon: Shield }]
     : menuItems;

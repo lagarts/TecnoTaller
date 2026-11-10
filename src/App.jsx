@@ -34,6 +34,8 @@ import PortalCliente from './pages/public/PortalCliente';
 import MisPagos from './pages/trabajador/MisPagos';
 import Suscripcion from './pages/Suscripcion';
 import SubscriptionGate from './components/SubscriptionGate';
+import Turnos from './pages/Turnos';
+import PortalTurnos from './pages/public/PortalTurnos';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -71,6 +73,7 @@ function AppRoutes() {
         <Route path="taller/ordenes" element={<Ordenes />} />
         <Route path="taller/presupuesto" element={<Presupuesto />} />
         <Route path="taller/calendario" element={<Calendario />} />
+        <Route path="taller/turnos" element={<Turnos />} />
         <Route path="taller/recordatorios" element={<Recordatorios />} />
         <Route path="taller/vehiculos" element={<Vehiculos />} />
         <Route path="tienda" element={<Tienda />} />
@@ -93,6 +96,7 @@ function AppRoutes() {
       </Route>
 
       <Route path="/suscripcion" element={<ProtectedRoute><Suscripcion /></ProtectedRoute>} />
+      <Route path="/turnos" element={<PortalTurnos />} />
       <Route path="/portal/:userId" element={<PortalCliente />} />
       <Route path="/reservar/:userId" element={<ReservarTurno />} />
       <Route path="/historial" element={<HistorialPatente />} />
