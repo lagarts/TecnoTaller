@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, Plus, Phone, Mail, User, X, MapPin, FileText, Pencil } from 'lucide-react';
+import { Search, Plus, Phone, Mail, User, X, MapPin, FileText, Pencil, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 
@@ -167,6 +167,16 @@ export default function Contactos() {
     setNewContact(emptyContact);
   };
 
+  const handleDelete = async (c) => {
+    if (!confirm(`¿Eliminar el cliente "${c.name}"?\n\nSe eliminará también su vehículo vinculado. Esta acción no se puede deshacer.`)) return;
+    const { error } = await supabase.from('clients').delete().eq('id', c.id);
+    if (error) {
+      alert('Error al eliminar: ' + error.message);
+      return;
+    }
+    setContacts(contacts.filter(x => x.id !== c.id));
+  };
+
   const filtered = contacts.filter(c =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
     (c.phone || '').includes(search) ||
@@ -232,9 +242,14 @@ export default function Contactos() {
                         </span>
                       )}
                     </div>
-                    <button onClick={() => handleEdit(c)} className="text-primary-400 hover:text-primary-300 p-2 transition-colors flex-shrink-0" title="Editar cliente">
-                      <Pencil className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center flex-shrink-0">
+                      <button onClick={() => handleEdit(c)} className="text-primary-400 hover:text-primary-300 p-2 transition-colors" title="Editar cliente">
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => handleDelete(c)} className="text-gray-500 hover:text-red-400 p-2 transition-colors" title="Eliminar cliente">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
