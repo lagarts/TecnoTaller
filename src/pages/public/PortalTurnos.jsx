@@ -1,9 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Calendar, Clock, Car, FileText, LogOut, Plus, Wrench, ShieldCheck,
-  User, Phone, CreditCard, Check, X, Trash2, Edit3, ChevronRight, AlertCircle
+  User, Phone, CreditCard, Check, X, Trash2, Edit3, ChevronRight, AlertCircle,
+  Download, Upload, Database, Info, CheckCircle2, Users
 } from 'lucide-react';
 import { portalClient, portalRegister, portalLogin, portalLogout } from '../../lib/portal';
+import {
+  buildClientPayload, importClientPayload, downloadJson,
+  readFileText, parsePortabilityFile, fileSummary, CLIENT_FILE_TYPE
+} from '../../lib/portability';
 
 const inputClass = "bg-[#0f1219] border border-gray-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 w-full";
 const labelClass = "block text-xs text-gray-400 mb-1";
@@ -71,8 +76,9 @@ export default function PortalClienteTurnos() {
 
   const tabs = [
     { id: 'turnos', label: 'Turnos', icon: Calendar },
-    { id: 'vehiculos', label: 'Mis vehículos', icon: Car },
+    { id: 'vehiculos', label: 'Vehículos', icon: Car },
     { id: 'historial', label: 'Historial', icon: FileText },
+    { id: 'datos', label: 'Mis datos', icon: Database },
   ];
 
   return (
@@ -127,6 +133,7 @@ export default function PortalClienteTurnos() {
         {tab === 'turnos' && <TurnosTab profile={profile} showToast={showToast} />}
         {tab === 'vehiculos' && <VehiculosTab profile={profile} showToast={showToast} />}
         {tab === 'historial' && <HistorialTab profile={profile} showToast={showToast} />}
+        {tab === 'datos' && <DatosTab profile={profile} showToast={showToast} />}
       </div>
     </div>
   );
@@ -880,6 +887,224 @@ function RecordCard({ r, canEdit, onEdit, onRemove }) {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ============================================================
+// MIS DATOS: exportar / importar (portabilidad)
+// ============================================================
+function DatosTab({ profile, showToast }) {
+  const [busy, setBusy] = useState('');
+  const [preview, setPreview] = useState(null);
+  const [result, setResult] = useState(null);
+  const fileRef = useRef(null);
+
+  const doExport = async () => {
+    setBusy('export');
+    try {
+      const [{ data: vehicles, error: vErr }, { data: records, error: rErr }] = await Promise.all([
+        portalClient.from('portal_vehicles').select('*').order('created_at'),
+        portalClient.from('service_records').select('*'),
+      ]);
+      if (vErr || rErr) { showToast('No se pudieron leer tus datos', false); return; }
+      const payload = buildClientPayload(profile, vehicles || [], records || []);
+      const totalRecords = payload.vehicles.reduce((n, v) => n + v.records.length, 0);
+      if (payload.vehicles.length === 0 && totalRecords === 0) {
+        showToast('Todavía no tenés datos para descargar', false);
+        return;
+      }
+      downloadJson(
+        `tecnotaller-datos-${profile?.dni || 'cliente'}-${new Date().toISOString().slice(0, 10)}.json`,
+        payload
+      );
+      showToast('Archivo descargado ✓ Guardalo en un lugar seguro');
+    } catch (e) {
+      console.error(e);
+      showToast('No se pudo generar el archivo', false);
+    }
+    setBusy('');
+  };
+
+  const handleFile = async (e) => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    setBusy('read');
+    try {
+      const text = await readFileText(f);
+      const { file, error } = parsePortabilityFile(text);
+      if (error) { showToast(error, false); return; }
+      if (file.type !== CLIENT_FILE_TYPE) {
+        showToast('Ese archivo es un respaldo completo del taller. El tuyo es el que genera "Descargar mis datos".', false);
+        return;
+      }
+      const fileDni = String(file.client?.dni || '').trim();
+      if (fileDni && profile?.dni && fileDni !== String(profile.dni).trim()) {
+        const ok = confirm(
+          `Este archivo corresponde al DNI ${fileDni}, pero ingresaste con DNI ${profile.dni}.\n\n¿Importarlo de todos modos?`
+        );
+        if (!ok) return;
+      }
+      setPreview(file);
+    } catch (err) {
+      console.error(err);
+      showToast('No se pudo leer el archivo', false);
+    }
+    setBusy('');
+  };
+
+  const runImport = async () => {
+    if (!preview) return;
+    setBusy('import');
+    const res = await importClientPayload(preview, { client: portalClient, profile });
+    setBusy('');
+    setPreview(null);
+    if (res.error) { showToast(res.error, false); return; }
+    setResult(res);
+    showToast('Importación finalizada ✓');
+  };
+
+  const s = preview ? fileSummary(preview) : null;
+
+  return (
+    <div className="space-y-4 max-w-lg mx-auto">
+      {/* Descargar */}
+      <div className="bg-[#1a1f2e] border border-gray-700 rounded-xl p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Download className="w-4 h-4 text-emerald-400" />
+          <h2 className="text-sm font-bold text-white uppercase tracking-wider">Descargar mis datos</h2>
+        </div>
+        <p className="text-gray-400 text-xs leading-relaxed mb-3">
+          Se genera un archivo con tus <span className="text-gray-300">vehículos</span> y todo el{' '}
+          <span className="text-gray-300">historial de servicios</span> (fecha, kilometraje, precio, notas).
+          Servís para no perder nada si cambiás de taller.{' '}
+          <span className="text-gray-600">No incluye tu contraseña.</span>
+        </p>
+        <button
+          onClick={doExport}
+          disabled={busy !== ''}
+          className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+        >
+          {busy === 'export'
+            ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+            : <Download className="w-4 h-4" />}
+          {busy === 'export' ? 'Generando archivo…' : 'Descargar archivo JSON'}
+        </button>
+      </div>
+
+      {/* Importar */}
+      <div className="bg-[#1a1f2e] border border-gray-700 rounded-xl p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Upload className="w-4 h-4 text-primary-400" />
+          <h2 className="text-sm font-bold text-white uppercase tracking-wider">Importar mis datos</h2>
+        </div>
+        <p className="text-gray-400 text-xs leading-relaxed mb-3">
+          Si ya te registriste en un taller nuevo, elegí el archivo que descargaste antes y recuperás todo:
+          vehículos e historial. La contraseña nunca viaja en el archivo, por eso en cada taller nuevo te
+          registrás de nuevo con tu DNI.
+        </p>
+        <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={handleFile} />
+        <button
+          onClick={() => fileRef.current && fileRef.current.click()}
+          disabled={busy !== ''}
+          className="w-full flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+        >
+          {busy === 'read'
+            ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+            : <Upload className="w-4 h-4" />}
+          Elegir archivo…
+        </button>
+      </div>
+
+      {/* Vista previa antes de importar */}
+      {preview && (
+        <div className="bg-[#1a1f2e] border border-primary-500/40 rounded-xl p-4 space-y-3">
+          <p className="text-xs font-bold text-primary-400 uppercase tracking-wider">Vista previa del archivo</p>
+          <div className="bg-[#0f1219] border border-gray-700 rounded-lg p-3 space-y-1.5 text-sm">
+            <p className="text-white flex items-center gap-2">
+              <Users className="w-4 h-4 text-primary-400" />
+              {preview.client?.name || 'Cliente'} {preview.client?.dni ? <span className="text-gray-500">· DNI {preview.client.dni}</span> : null}
+            </p>
+            <p className="text-gray-300 flex items-center gap-2">
+              <Car className="w-4 h-4 text-primary-400" /> {s.vehicles} vehículo{s.vehicles === 1 ? '' : 's'}
+            </p>
+            <p className="text-gray-300 flex items-center gap-2">
+              <FileText className="w-4 h-4 text-primary-400" /> {s.records} registro{s.records === 1 ? '' : 's'} de servicios
+            </p>
+          </div>
+          <p className="text-[11px] text-gray-500">
+            Lo que ya exista no se duplica ni se pisa. Los vehículos con patente registrada a otro nombre se omiten.
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPreview(null)}
+              className="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-300 py-2.5 rounded-lg text-sm font-medium transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={runImport}
+              disabled={busy === 'import'}
+              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {busy === 'import'
+                ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                : <Check className="w-4 h-4" />}
+              Importar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Resultado */}
+      {result && (
+        <div className="bg-[#1a1f2e] border border-emerald-500/40 rounded-xl p-4 space-y-3">
+          <p className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5" /> Importación finalizada
+          </p>
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <ResStat label="Vehículos nuevos" value={result.vehiculos} />
+            <ResStat label="Ya existentes" value={result.vehiculosExistentes} />
+            <ResStat label="Servicios importados" value={result.servicios} />
+            <ResStat label="Sin importar" value={result.serviciosOmitidos + result.vehiculosOmitidos} warn={(result.serviciosOmitidos + result.vehiculosOmitidos) > 0} />
+          </div>
+          {result.avisos.length > 0 && (
+            <div className="space-y-1">
+              {result.avisos.map((a, i) => (
+                <p key={i} className="text-[11px] text-gray-400 flex items-start gap-1.5">
+                  <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-gray-500" />
+                  {a}
+                </p>
+              ))}
+            </div>
+          )}
+          <button
+            onClick={() => setResult(null)}
+            className="w-full bg-gray-700 hover:bg-gray-600 text-gray-300 py-2.5 rounded-lg text-sm font-medium transition-colors"
+          >
+            Entendido
+          </button>
+        </div>
+      )}
+
+      {/* Aviso de seguridad */}
+      <div className="bg-[#1a1f2e] border border-gray-700/50 rounded-xl p-4 flex items-start gap-2.5">
+        <ShieldCheck className="w-4 h-4 text-gray-500 flex-shrink-0 mt-0.5" />
+        <p className="text-[11px] text-gray-500 leading-relaxed">
+          Tu contraseña nunca se guarda en el archivo ni se puede recuperar desde él. Por eso, en cada taller
+          nuevo te registrás una vez con tu DNI y contraseña, y después importás tus datos.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function ResStat({ label, value, warn }) {
+  return (
+    <div className={`bg-[#0f1219] border rounded-lg px-3 py-2 ${warn ? 'border-yellow-500/40' : 'border-gray-700'}`}>
+      <p className={`font-bold text-sm ${warn ? 'text-yellow-300' : 'text-white'}`}>{value}</p>
+      <p className="text-[10px] text-gray-500">{label}</p>
     </div>
   );
 }

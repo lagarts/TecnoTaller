@@ -4,8 +4,13 @@ import { supabase } from '../lib/supabase';
 import {
   Users, Bell, Trash2, Send, Shield, Gift,
   Calendar, Search, AlertTriangle, CheckCircle, X, CreditCard,
-  Clock, Check, XCircle, Wallet
+  Clock, Check, XCircle, Wallet, Database, Download, Upload,
+  Car, FileText, Info, UserCheck
 } from 'lucide-react';
+import {
+  buildPortalPayload, importPortalPayload, downloadJson,
+  readFileText, parsePortabilityFile, fileSummary, PORTAL_FILE_TYPE
+} from '../lib/portability';
 
 export default function AdminPanel() {
   const { user } = useAuth();
@@ -19,6 +24,9 @@ export default function AdminPanel() {
   const [notiMessage, setNotiMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [toast, setToast] = useState(null);
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
 
   useEffect(() => {
     if (user?.role === 'admin') {
@@ -147,6 +155,67 @@ export default function AdminPanel() {
     setNotifications(notifications.filter(n => n.id !== id));
   };
 
+  // --------------------------------------------------------
+  // Portabilidad de datos (exportar / importar el portal)
+  // --------------------------------------------------------
+  const handleExportPortal = async () => {
+    setExporting(true);
+    try {
+      const [cRes, vRes, rRes, aRes] = await Promise.all([
+        supabase.from('portal_clients').select('*'),
+        supabase.from('portal_vehicles').select('*'),
+        supabase.from('service_records').select('*'),
+        supabase.from('appointments').select('*'),
+      ]);
+      const err = cRes.error || vRes.error || rRes.error || aRes.error;
+      if (err) { showToast('No se pudo exportar: ' + err.message, 'error'); return; }
+      const payload = buildPortalPayload({
+        clients: cRes.data || [],
+        vehicles: vRes.data || [],
+        records: rRes.data || [],
+        appointments: aRes.data || [],
+      });
+      downloadJson(`tecnotaller-portal-${new Date().toISOString().slice(0, 10)}.json`, payload);
+      showToast(`Portal exportado ✓ (${payload.data.clients.length} clientes, ${payload.data.vehicles.length} vehículos)`);
+    } catch (e) {
+      console.error(e);
+      showToast('No se pudo generar el archivo', 'error');
+    }
+    setExporting(false);
+  };
+
+  const handleImportFile = async (e) => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    setImporting(true);
+    try {
+      const text = await readFileText(f);
+      const { file, error } = parsePortabilityFile(text);
+      if (error) { showToast(error, 'error'); return; }
+      if (file.type !== PORTAL_FILE_TYPE) {
+        showToast('Ese archivo es de un cliente. Usá "Importar respaldo del portal" con el archivo del taller.', 'error');
+        return;
+      }
+      const s = fileSummary(file);
+      const ok = confirm(
+        `¿Importar "${f.name}"?\n\n` +
+        `Clientes: ${s.clients} • Vehículos: ${s.vehicles} • Servicios: ${s.records} • Turnos: ${s.appointments}\n\n` +
+        'Los clientes que todavía no tengan cuenta quedarán como pendientes (se importan cuando se registren). ' +
+        'El proceso se puede repetir sin duplicar datos.\n\n¿Continuar?'
+      );
+      if (!ok) return;
+      const res = await importPortalPayload(file, { client: supabase });
+      if (res.error) { showToast(res.error, 'error'); return; }
+      setImportResult(res);
+      showToast('Importación finalizada ✓');
+    } catch (err) {
+      console.error(err);
+      showToast('No se pudo leer el archivo', 'error');
+    }
+    setImporting(false);
+  };
+
   if (user?.role !== 'admin') {
     return (
       <div className="h-full min-h-[60vh] flex items-center justify-center bg-[#0f1219]">
@@ -223,6 +292,17 @@ export default function AdminPanel() {
               {payments.filter(p => p.status === 'pendiente').length}
             </span>
           )}
+        </button>
+        <button
+          onClick={() => setActiveTab('datos')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'datos'
+              ? 'border-primary-500 text-primary-400'
+              : 'border-transparent text-gray-500 hover:text-gray-300'
+          }`}
+        >
+          <Database className="w-4 h-4" />
+          Datos
         </button>
       </div>
 
@@ -503,7 +583,135 @@ export default function AdminPanel() {
             </div>
           </div>
         )}
+
+        {activeTab === 'datos' && (
+          <div className="space-y-6 max-w-3xl">
+            {/* Explicación */}
+            <div className="bg-[#1a1f2e] border border-gray-700/50 rounded-xl p-4 flex items-start gap-3">
+              <Info className="w-4 h-4 text-primary-400 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-gray-400 leading-relaxed">
+                Portabilidad de datos del portal de turnos: clientes, vehículos, turnos e historial de servicios.
+                <span className="text-gray-500"> Las contraseñas nunca se guardan en el archivo</span> — si el
+                archivo se importa en otra instancia, los clientes se registran de nuevo con su DNI y los datos
+                se les asocian automáticamente al importar.
+              </p>
+            </div>
+
+            {/* Exportar */}
+            <div className="bg-[#1a1f2e] border border-gray-700/50 rounded-xl p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <Download className="w-4 h-4 text-emerald-400" />
+                <h3 className="font-semibold text-white text-sm">Exportar todo el portal</h3>
+              </div>
+              <p className="text-xs text-gray-400">
+                Descarga un respaldo con todos los clientes del portal, sus vehículos, los turnos y el historial
+                de servicios. Guardalo en un lugar seguro.
+              </p>
+              <button
+                onClick={handleExportPortal}
+                disabled={exporting || importing}
+                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                {exporting
+                  ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  : <Download className="w-4 h-4" />}
+                {exporting ? 'Exportando…' : 'Descargar respaldo JSON'}
+              </button>
+            </div>
+
+            {/* Importar */}
+            <div className="bg-[#1a1f2e] border border-gray-700/50 rounded-xl p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <Upload className="w-4 h-4 text-primary-400" />
+                <h3 className="font-semibold text-white text-sm">Importar respaldo del portal</h3>
+              </div>
+              <p className="text-xs text-gray-400">
+                Carga un archivo exportado desde acá (o un respaldo individual de un cliente). Es seguro repetirlo:
+                lo que ya exista no se duplica.
+              </p>
+              <label className={`inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${importing ? 'opacity-50 pointer-events-none' : ''}`}>
+                {importing
+                  ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  : <Upload className="w-4 h-4" />}
+                {importing ? 'Importando…' : 'Elegir archivo…'}
+                <input type="file" accept="application/json,.json" className="hidden" onChange={handleImportFile} disabled={importing} />
+              </label>
+            </div>
+
+            {/* Resultado de la importación */}
+            {importResult && (
+              <div className="bg-[#1a1f2e] border border-emerald-500/40 rounded-xl p-5 space-y-4">
+                <p className="text-sm font-bold text-emerald-400 flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4" /> Importación finalizada
+                </p>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <AdminStat label="Clientes listos" value={importResult.clientes} />
+                  <AdminStat label="Vehículos nuevos" value={importResult.vehiculos} />
+                  <AdminStat label="Servicios importados" value={importResult.servicios} />
+                  <AdminStat label="Turnos importados" value={importResult.turnos} />
+                </div>
+
+                {(importResult.vehiculosExistentes > 0 || importResult.serviciosDuplicados > 0 || importResult.vehiculosOmitidos > 0 || importResult.serviciosOmitidos > 0 || importResult.turnosOmitidos > 0) && (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <AdminStat label="Vehículos ya existentes" value={importResult.vehiculosExistentes} muted />
+                    <AdminStat label="Servicios duplicados" value={importResult.serviciosDuplicados} muted />
+                    <AdminStat label="Sin importar (veh/serv)" value={importResult.vehiculosOmitidos + importResult.serviciosOmitidos} muted warn={(importResult.vehiculosOmitidos + importResult.serviciosOmitidos) > 0} />
+                    <AdminStat label="Turnos omitidos" value={importResult.turnosOmitidos} muted warn={importResult.turnosOmitidos > 0} />
+                  </div>
+                )}
+
+                {importResult.clientesPendientes.length > 0 && (
+                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 space-y-2">
+                    <p className="text-xs font-bold text-yellow-300 flex items-center gap-1.5">
+                      <UserCheck className="w-3.5 h-3.5" />
+                      {importResult.clientesPendientes.length} cliente(s) sin cuenta todavía
+                    </p>
+                    <p className="text-[11px] text-yellow-200/70">
+                      Pasales el link <span className="text-yellow-200">/turnos</span> para que se registren con su DNI
+                      y después volvé a importar el mismo archivo: sus datos se completan solos, sin duplicar nada.
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {importResult.clientesPendientes.map((c) => (
+                        <span key={c.dni} className="bg-[#0f1219] border border-yellow-500/20 text-gray-300 text-[11px] px-2 py-1 rounded">
+                          DNI {c.dni}{c.name ? ` · ${c.name}` : ''}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {importResult.avisos.length > 0 && (
+                  <div className="space-y-1">
+                    {importResult.avisos.map((a, i) => (
+                      <p key={i} className="text-[11px] text-gray-400 flex items-start gap-1.5">
+                        <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-gray-500" />
+                        {a}
+                      </p>
+                    ))}
+                  </div>
+                )}
+
+                <button
+                  onClick={() => setImportResult(null)}
+                  className="bg-gray-700 hover:bg-gray-600 text-gray-300 px-5 py-2.5 rounded-lg text-sm font-medium transition-colors"
+                >
+                  Cerrar
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+function AdminStat({ label, value, muted, warn }) {
+  return (
+    <div className={`bg-[#0f1219] border rounded-lg px-3 py-2.5 ${warn ? 'border-yellow-500/40' : muted ? 'border-gray-700/50' : 'border-gray-700'}`}>
+      <p className={`font-bold text-base ${warn ? 'text-yellow-300' : muted ? 'text-gray-300' : 'text-white'}`}>{value}</p>
+      <p className="text-[10px] text-gray-500 leading-tight">{label}</p>
     </div>
   );
 }
