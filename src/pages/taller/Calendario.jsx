@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronLeft, ChevronRight, Plus, X, Link2, Clock, User, Copy, Check, MessageCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, X, Clock, User, Check, MessageCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
@@ -18,7 +18,6 @@ export default function Calendario() {
   const [searchClient, setSearchClient] = useState('');
   const [showClientPicker, setShowClientPicker] = useState(false);
   const [selectedClient, setSelectedClient] = useState(null);
-  const [copied, setCopied] = useState(false);
   const [showWhatsappModal, setShowWhatsappModal] = useState(false);
   const [whatsappTemplate, setWhatsappTemplate] = useState(() => localStorage.getItem('whatsapp_template') || '');
 
@@ -104,17 +103,6 @@ export default function Calendario() {
     }
   };
 
-  const getShareLink = () => {
-    const baseUrl = window.location.origin;
-    return `${baseUrl}/portal/${user.id}`;
-  };
-
-  const copyLink = () => {
-    navigator.clipboard.writeText(getShareLink());
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
   const sendWhatsApp = (evt) => {
     const phone = evt.client_phone?.replace(/\D/g, '') || '';
     const template = localStorage.getItem('whatsapp_template') || '';
@@ -132,10 +120,6 @@ export default function Calendario() {
       <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <h1 className="text-xl font-bold text-white">Calendario</h1>
         <div className="flex items-center gap-2">
-          <button onClick={copyLink} className="flex items-center gap-2 bg-[#1a1f2e] hover:bg-[#222839] text-gray-300 px-3 py-2 rounded-lg text-sm transition-colors border border-gray-700">
-            {copied ? <Check className="w-4 h-4 text-green-400" /> : <Link2 className="w-4 h-4" />}
-            {copied ? 'Copiado!' : 'Link de reservas'}
-          </button>
           <button onClick={() => { setShowWhatsappModal(true); }} className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors">
             <MessageCircle className="w-4 h-4" />
             WhatsApp
